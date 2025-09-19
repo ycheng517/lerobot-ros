@@ -27,6 +27,8 @@ from rclpy.publisher import Publisher
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from control_msgs.action import FollowJointTrajectory
+
 
 from .config_ros import ActionType, GripperActionType, ROS2InterfaceConfig
 from .moveit_servo import MoveIt2Servo
@@ -76,9 +78,13 @@ class ROS2Interface:
                 Float64MultiArray, "/position_controller/commands", 10
             )
         elif self.action_type == ActionType.JOINT_TRAJECTORY:
-            self.traj_cmd_pub = self.robot_node.create_publisher(
-                JointTrajectory, "/arm_controller/joint_trajectory", 10
-            )
+            self.traj_action_client = ActionClient(
+            self.robot_node,
+            FollowJointTrajectory,
+            "/arm_controller/follow_joint_trajectory",
+            callback_group=ReentrantCallbackGroup(),
+        )
+
         elif self.action_type == ActionType.CARTESIAN_VELOCITY:
             self.moveit2_servo = MoveIt2Servo(
                 node=self.robot_node,
@@ -146,14 +152,38 @@ class ROS2Interface:
             )
 
         if self.action_type == ActionType.JOINT_TRAJECTORY:
-            if self.traj_cmd_pub is None:
-                raise DeviceNotConnectedError("Trajectory command publisher is not initialized.")
-            msg = JointTrajectory()
-            msg.joint_names = self.config.arm_joint_names
+            if not self.traj_action_client:
+                raise DeviceNotConnectedError("Trajectory action client is not initialized.")
+
+            if not self.traj_action_client.wait_for_server(timeout_sec=1.0):
+                logger.error("JointTrajectory action server not available")
+                return
+
+            goal_msg = FollowJointTrajectory.Goal()
+            goal_msg.trajectory = JointTrajectory()
+            goal_msg.trajectory.joint_names = self.config.arm_joint_names
+            print (goal_msg.trajectory.joint_names)
+
             point = JointTrajectoryPoint()
             point.positions = joint_positions
-            msg.points = [point]
-            self.traj_cmd_pub.publish(msg)
+            point.time_from_start.sec = 1  # simple 1-second execution
+            goal_msg.trajectory.points.append(point)
+
+            send_goal_future = self.traj_action_client.send_goal_async(goal_msg)
+            rclpy.spin_until_future_complete(self.robot_node, send_goal_future)
+            goal_handle = send_goal_future.result()
+
+            if not goal_handle.accepted:
+                logger.error("Trajectory goal rejected")
+                return
+
+            result_future = goal_handle.get_result_async()
+            rclpy.spin_until_future_complete(self.robot_node, result_future)
+            result = result_future.result().result
+            if result.error_code != 0:
+                logger.error(f"Trajectory execution failed with error code {result.error_code}")
+            return
+
         else:
             if self.pos_cmd_pub is None:
                 raise DeviceNotConnectedError("Position command publisher is not initialized.")
@@ -256,9 +286,9 @@ class ROS2Interface:
         if self.pos_cmd_pub:
             self.pos_cmd_pub.destroy()
             self.pos_cmd_pub = None
-        if self.traj_cmd_pub:
-            self.traj_cmd_pub.destroy()
-            self.traj_cmd_pub = None
+        if hasattr(self, "traj_action_client") and self.traj_action_client:
+            self.traj_action_client.destroy()
+            self.traj_action_client = None
         if self.gripper_action_client:
             self.gripper_action_client.destroy()
             self.gripper_action_client = None
