@@ -66,7 +66,7 @@ ros2 launch lerobot_controller so101_controller.launch.py && \
 
 # In terminal 3, run lerobot with the ROS version of so101 and keyboard teleop
 cd <YOUR lerobot-ros DIRECTORY>
-lerobot-teleop \
+lerobot-teleoperate \
   --robot.type=so101_ros \
   --robot.id=my_awesome_follower_arm \
   --teleop.type=keyboard_joint \
@@ -135,7 +135,7 @@ The repo supports two gripper control modes that can be configured via the `grip
 - Sends action goals to `/gripper_controller/gripper_cmd`
 - Provides feedback on whether the gripper reached its target position
 
-### Add Robot and Config to Lerobot-ros
+### Code Changes to Lerobot-ros
 
 Extend the `ROS2Robot` class in [robot.py](./lerobot_robot_ros/lerobot_robot_ros/robot.py).
 This class can be a simple pass-through. It's just is needed to satisfy lerobot device discovery requirements.
