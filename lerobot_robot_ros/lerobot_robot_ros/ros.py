@@ -18,9 +18,9 @@ from functools import cached_property
 from typing import Any
 
 from lerobot.cameras.utils import make_cameras_from_configs
-from lerobot.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 from lerobot.robots import Robot
 from lerobot.robots.utils import ensure_safe_goal_position
+from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 
 from .config_ros import ActionType, ROS2Config
 from .ros_interface import ROS2Interface
@@ -181,3 +181,11 @@ class ROS2Robot(Robot):
         self.ros2_interface.disconnect()
 
         logger.info(f"{self} disconnected.")
+
+
+class SO101ROS(ROS2Robot):
+    pass
+
+
+class AnninAR4(ROS2Robot):
+    pass

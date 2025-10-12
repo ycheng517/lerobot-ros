@@ -1,10 +1,10 @@
 from queue import Queue
 from typing import Any
 
-from lerobot.errors import DeviceNotConnectedError
 from lerobot.teleoperators.keyboard import KeyboardTeleop
+from lerobot.utils.errors import DeviceNotConnectedError
 
-from .config_keyboard_joint import KeyboardJointConfig
+from .config_keyboard_joint import KeyboardJointTeleopConfig
 
 
 class KeyboardJointTeleop(KeyboardTeleop):
@@ -13,10 +13,10 @@ class KeyboardJointTeleop(KeyboardTeleop):
     Designed to be used with the `So100FollowerEndEffector` robot.
     """
 
-    config_class = KeyboardJointConfig
+    config_class = KeyboardJointTeleopConfig
     name = "keyboard_ee"
 
-    def __init__(self, config: KeyboardJointConfig):
+    def __init__(self, config: KeyboardJointTeleopConfig):
         super().__init__(config)
         self.config = config
         self.misc_keys_queue: Queue[Any] = Queue()

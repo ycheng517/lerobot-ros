@@ -16,9 +16,9 @@
 homepage = "https://github.com/ycheng517/lerobot-ros"
 
 [project]
-name = "lerobot-ros"
+name = "lerobot-teleoperator-ros"
 version = "0.1.0"
-description = "🤗 A lightweight ROS 2 wrapper for lerobot"
+description = "🤗 A lightweight ROS 2 wrapper for lerobot (teleoperator part)"
 authors = [
     { name = "Yifei Cheng", email = "ycheng517@gmail.com" },
 ]

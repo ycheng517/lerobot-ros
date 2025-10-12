@@ -1,7 +1,7 @@
 from lerobot import replay as lr_rec
 from lerobot.robots import Robot, RobotConfig
 
-from lerobot_ros import ROS2Config, ROS2Robot
+from lerobot_robot_ros import ROS2Config, ROS2Robot
 
 # Override the default robot creation functions to use ROS2-specific
 #  implementations. This allows us to create our own robots.

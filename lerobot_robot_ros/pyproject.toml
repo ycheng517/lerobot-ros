@@ -1,0 +1,62 @@
+# Copyright 2024 The HuggingFace Inc. team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[project.urls]
+homepage = "https://github.com/ycheng517/lerobot-ros"
+
+[project]
+name = "lerobot-robot-ros"
+version = "0.1.0"
+description = "🤗 A lightweight ROS 2 wrapper for lerobot (robot part)"
+authors = [
+    { name = "Yifei Cheng", email = "ycheng517@gmail.com" },
+]
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+keywords = ["robotics", "deep learning", "pytorch", "ros2"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "lerobot",
+    "rclpy",
+    "control_msgs",
+    "sensor_msgs",
+    "std_msgs",
+    "geometry_msgs",
+    "moveit_msgs",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+exclude = ["*_pb2.py", "*_pb2_grpc.py"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "N", "B", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

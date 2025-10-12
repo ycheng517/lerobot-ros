@@ -5,5 +5,5 @@ from lerobot.teleoperators.config import TeleoperatorConfig
 
 @TeleoperatorConfig.register_subclass("gamepad_6dof")
 @dataclass
-class GamepadTeleop6DOFConfig(TeleoperatorConfig):
+class Gamepad6DOFTeleopConfig(TeleoperatorConfig):
     use_gripper: bool = True

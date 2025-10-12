@@ -2,7 +2,8 @@ from lerobot import record as lr_rec
 from lerobot.robots import Robot, RobotConfig
 from lerobot.teleoperators import Teleoperator, TeleoperatorConfig
 
-from lerobot_ros import GamepadTeleop6DOF, GamepadTeleop6DOFConfig, ROS2Config, ROS2Robot
+from lerobot_robot_ros import ROS2Config, ROS2Robot
+from lerobot_teleoperator_ros import Gamepad6DOFTeleop, Gamepad6DOFTeleopConfig
 
 # Override the default robot and teleoperator creation functions to use
 # ROS2-specific implementations.
@@ -21,10 +22,10 @@ def make_my_robot_from_config(config: RobotConfig) -> Robot:
 
 def make_my_teleoperator_from_config(config: TeleoperatorConfig) -> Teleoperator:
     """Create a teleoperator instance based on the provided configuration."""
-    if not isinstance(config, GamepadTeleop6DOFConfig):
+    if not isinstance(config, Gamepad6DOFTeleopConfig):
         return orig_make_teleoperator_from_config(config)
 
-    return GamepadTeleop6DOF(config)
+    return Gamepad6DOFTeleop(config)
 
 
 # Replace the default creation function with our ROS2-specific ones

@@ -3,11 +3,11 @@ from typing import Any
 import numpy as np
 from lerobot.teleoperators import Teleoperator
 
-from .config_gamepad_6dof import GamepadTeleop6DOFConfig
+from .config_gamepad_6dof import Gamepad6DOFTeleopConfig
 from .gamepad_6dof_utils import GamepadController6DOF
 
 
-class GamepadTeleop6DOF(Teleoperator):
+class Gamepad6DOFTeleop(Teleoperator):
     """
     Teleop class to use gamepad inputs for 6-DOF control.
     Mapping:
@@ -18,10 +18,10 @@ class GamepadTeleop6DOF(Teleoperator):
     - Button: Gripper control (nominally open, close when pressed)
     """
 
-    config_class = GamepadTeleop6DOFConfig
+    config_class = Gamepad6DOFTeleopConfig
     name = "gamepad_6dof"
 
-    def __init__(self, config: GamepadTeleop6DOFConfig):
+    def __init__(self, config: Gamepad6DOFTeleopConfig):
         super().__init__(config)
         self.config = config
         self.robot_type = config.type

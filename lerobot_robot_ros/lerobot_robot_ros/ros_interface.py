@@ -18,7 +18,7 @@ import time
 
 import rclpy
 from control_msgs.action import GripperCommand
-from lerobot.errors import DeviceNotConnectedError
+from lerobot.utils.errors import DeviceNotConnectedError
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import Executor, SingleThreadedExecutor
