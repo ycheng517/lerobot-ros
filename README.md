@@ -135,17 +135,17 @@ The repo supports two gripper control modes that can be configured via the `grip
 - Sends action goals to `/gripper_controller/gripper_cmd`
 - Provides feedback on whether the gripper reached its target position
 
-### Configuration
+### Add Robot and Config to Lerobot-ros
 
 Extend the `ROS2Robot` class in [robot.py](./lerobot_robot_ros/lerobot_robot_ros/robot.py).
-This class can be a simple pass-through that doesn't do anything, but is needed to satisfy lerobot device discovery requirements.
+This class can be a simple pass-through. It's just is needed to satisfy lerobot device discovery requirements.
 
 ```python
 class MyRobot(ROS2Robot):
   pass
 ```
 
-Create a config class for your robot by sub-classing `ROS2Config` in [config.py](./lerobot_robot_ros/lerobot_robot_ros/config.py).
+Then, create a config class for your robot by sub-classing `ROS2Config` in [config.py](./lerobot_robot_ros/lerobot_robot_ros/config.py).
 The name of this class must be the same as your robot class, suffixed by `Config`.
 You may override joint names, gripper configurations, and other parameters as needed.
 An example config class for joint velocity control may look like this:
