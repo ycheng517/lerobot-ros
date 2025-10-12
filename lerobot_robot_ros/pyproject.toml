@@ -18,13 +18,13 @@ homepage = "https://github.com/ycheng517/lerobot-ros"
 [project]
 name = "lerobot-robot-ros"
 version = "0.1.0"
-description = "🤗 A lightweight ROS 2 wrapper for lerobot (robot part)"
+description = "🤗 A lightweight ROS 2 wrapper for lerobot"
 authors = [
     { name = "Yifei Cheng", email = "ycheng517@gmail.com" },
 ]
 readme = "README.md"
 license = { text = "Apache-2.0" }
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 keywords = ["robotics", "deep learning", "pytorch", "ros2"]
 classifiers = [
     "Development Status :: 3 - Alpha",

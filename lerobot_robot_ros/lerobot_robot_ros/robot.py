@@ -22,7 +22,7 @@ from lerobot.robots import Robot
 from lerobot.robots.utils import ensure_safe_goal_position
 from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 
-from .config_ros import ActionType, ROS2Config
+from .config import ActionType, ROS2Config
 from .ros_interface import ROS2Interface
 
 logger = logging.getLogger(__name__)

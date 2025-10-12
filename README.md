@@ -46,9 +46,10 @@ conda activate lerobot-ros
 git clone https://github.com/huggingface/lerobot
 pip install -e lerobot
 
-# Install lerobot-ros
+# Install lerobot-ros packages
 git clone https://github.com/ycheng517/lerobot-ros
-pip install -e lerobot-ros
+pip install -e lerobot-ros/lerobot_robot_ros
+pip install -e lerobot-ros/lerobot_teleoperator_devices
 ```
 
 Then, setup the Simulated SO-101 by following instructions in: https://github.com/Pavankv92/lerobot_ws
@@ -65,7 +66,7 @@ ros2 launch lerobot_controller so101_controller.launch.py && \
 
 # In terminal 3, run lerobot with the ROS version of so101 and keyboard teleop
 cd <YOUR lerobot-ros DIRECTORY>
-python scripts/teleoperate.py \
+lerobot-teleop \
   --robot.type=so101_ros \
   --robot.id=my_awesome_follower_arm \
   --teleop.type=keyboard_joint \
@@ -136,7 +137,16 @@ The repo supports two gripper control modes that can be configured via the `grip
 
 ### Configuration
 
-Create a config class for your robot by sub-classing `ROS2Config` in [config_ros.py](./lerobot_ros/robots/config_ros.py).
+Extend the `ROS2Robot` class in [robot.py](./lerobot_robot_ros/lerobot_robot_ros/robot.py).
+This class can be a simple pass-through that doesn't do anything, but is needed to satisfy lerobot device discovery requirements.
+
+```python
+class MyRobot(ROS2Robot):
+  pass
+```
+
+Create a config class for your robot by sub-classing `ROS2Config` in [config.py](./lerobot_robot_ros/lerobot_robot_ros/config.py).
+The name of this class must be the same as your robot class, suffixed by `Config`.
 You may override joint names, gripper configurations, and other parameters as needed.
 An example config class for joint velocity control may look like this:
 

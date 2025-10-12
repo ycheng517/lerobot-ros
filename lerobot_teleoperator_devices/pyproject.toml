@@ -16,9 +16,9 @@
 homepage = "https://github.com/ycheng517/lerobot-ros"
 
 [project]
-name = "lerobot-teleoperator-ros"
+name = "lerobot-teleoperator-devices"
 version = "0.1.0"
-description = "🤗 A lightweight ROS 2 wrapper for lerobot (teleoperator part)"
+description = "🤗 Teleoperators for lerobot"
 authors = [
     { name = "Yifei Cheng", email = "ycheng517@gmail.com" },
 ]
@@ -38,12 +38,6 @@ classifiers = [
 ]
 dependencies = [
     "lerobot",
-    "rclpy",
-    "control_msgs",
-    "sensor_msgs",
-    "std_msgs",
-    "geometry_msgs",
-    "moveit_msgs",
 ]
 
 [tool.ruff]
