@@ -83,6 +83,12 @@ class ROS2Robot(Robot):
             cam.connect()
         self.ros2_interface.connect()
 
+        # Move to home pose if configured
+        if self.config.go_home_on_connect and self.config.home_pose:
+            logger.info(f"Moving {self} to home pose...")
+            self._go_to_home_pose()
+            time.sleep(1)  # Wait for movement to start
+
     @property
     def is_calibrated(self) -> bool:
         return True
@@ -92,6 +98,31 @@ class ROS2Robot(Robot):
 
     def configure(self) -> None:
         pass  # robot must be configured before running LeRobot
+
+    def _go_to_home_pose(self) -> None:
+        """Move robot to the configured home pose."""
+        if not self.config.home_pose:
+            logger.warning("No home pose configured, skipping")
+            return
+
+        # Build action dict based on action type
+        if self.config.action_type == ActionType.CARTESIAN_VELOCITY:
+            logger.warning("Home pose not supported for CARTESIAN_VELOCITY mode")
+            return
+
+        # For joint position/trajectory control
+        home_action = {}
+        for joint_name in self.config.ros2_interface.arm_joint_names:
+            if joint_name in self.config.home_pose:
+                home_action[f"{joint_name}.pos"] = self.config.home_pose[joint_name]
+
+        # Add gripper if configured
+        gripper_name = self.config.ros2_interface.gripper_joint_name
+        if gripper_name and gripper_name in self.config.home_pose:
+            home_action["gripper.pos"] = self.config.home_pose[gripper_name]
+
+        if home_action:
+            self.send_action(home_action)
 
     def get_observation(self) -> dict[str, Any]:
         if not self.is_connected:
@@ -176,6 +207,15 @@ class ROS2Robot(Robot):
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
+        # Return to home pose if configured
+        if self.config.return_home_on_disconnect and self.config.home_pose:
+            logger.info(f"Returning {self} to home pose...")
+            try:
+                self._go_to_home_pose()
+                time.sleep(2)  # Wait for movement to complete
+            except Exception as e:
+                logger.warning(f"Failed to return to home pose: {e}")
+
         for cam in self.cameras.values():
             cam.disconnect()
         self.ros2_interface.disconnect()
@@ -189,3 +229,6 @@ class SO101ROS(ROS2Robot):
 
 class AnninAR4(ROS2Robot):
     pass
+
+class MyRobot(ROS2Robot):
+  pass

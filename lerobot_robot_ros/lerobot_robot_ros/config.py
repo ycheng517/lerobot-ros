@@ -80,6 +80,16 @@ class ROS2Config(RobotConfig):
     # ROS2 interface configuration
     ros2_interface: ROS2InterfaceConfig = field(default_factory=ROS2InterfaceConfig)
 
+    # Home/initial pose position (in radians for joint positions, 0-1 for gripper)
+    # This is a safe folded/home position where the arm starts and returns to
+    home_pose: dict[str, float] | None = None
+
+    # Move to home pose on connect
+    go_home_on_connect: bool = False
+
+    # Return to home pose on disconnect
+    return_home_on_disconnect: bool = False
+
 
 @RobotConfig.register_subclass("annin_ar4_mk1")
 @dataclass
@@ -120,4 +130,45 @@ class SO101ROSConfig(ROS2Config):
             gripper_open_position=1.74533,
             gripper_close_position=0.0,
         ),
+    )
+
+    # Home/folded pose for SO-101 (in radians)
+    # This is a safe compact position with arm folded up
+    home_pose: dict[str, float] = field(default_factory=lambda: {
+        "1": 0.0,      # Joint 1 (base) - centered
+        "2": -0.5,     # Joint 2 (shoulder) - lowered
+        "3": 1.0,      # Joint 3 (elbow) - bent inward
+        "4": -0.5,     # Joint 4 (wrist pitch) - folded down
+        "5": 0.0,      # Joint 5 (wrist roll) - centered
+        "6": 0.87,     # Gripper - half open (50% between 0.0 and 1.74533)
+    })
+
+    # Enable home pose behavior by default for safety
+    go_home_on_connect: bool = True
+    return_home_on_disconnect: bool = True
+
+
+
+@RobotConfig.register_subclass("my_ros2_robot")
+@dataclass
+class MyRobotConfig(ROS2Config):
+    action_type: ActionType = ActionType.JOINT_POSITION
+
+    ros2_interface: ROS2InterfaceConfig = field(
+        default_factory=lambda: ROS2InterfaceConfig(
+            base_link="base_link",
+            arm_joint_names=[
+                "joint_1",
+                "joint_2",
+                "joint_3",
+                "joint_4",
+                "joint_5",
+                "joint_6",
+            ],
+            gripper_joint_name="gripper_joint",
+            gripper_open_position=0.0,
+            gripper_close_position=1.0,
+            max_linear_velocity=0.05,  # m/s
+            max_angular_velocity=0.25,  # rad/s
+        )
     )

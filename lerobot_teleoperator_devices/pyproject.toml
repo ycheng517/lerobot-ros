@@ -51,5 +51,5 @@ select = ["E4", "E7", "E9", "F", "I", "N", "B", "C4", "SIM"]
 "__init__.py" = ["F401", "F403"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

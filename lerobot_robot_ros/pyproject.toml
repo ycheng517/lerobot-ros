@@ -45,6 +45,9 @@ dependencies = [
     "moveit_msgs",
 ]
 
+[project.scripts]
+lerobot-ros-teleoperate = "lerobot_robot_ros.scripts.lerobot_ros_teleoperate:main"
+
 [tool.ruff]
 line-length = 110
 target-version = "py310"
@@ -57,5 +60,5 @@ select = ["E4", "E7", "E9", "F", "I", "N", "B", "C4", "SIM"]
 "__init__.py" = ["F401", "F403"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

@@ -4,7 +4,7 @@ from typing import Any
 from lerobot.teleoperators.keyboard import KeyboardTeleop
 from lerobot.utils.errors import DeviceNotConnectedError
 
-from .config_keyboard_joint import KeyboardJointTeleopConfig
+from .config_keyboard_joint import KeyboardJointTeleopConfig, KeyboardJointHardwareTeleopConfig
 
 
 class KeyboardJointTeleop(KeyboardTeleop):
@@ -20,7 +20,11 @@ class KeyboardJointTeleop(KeyboardTeleop):
         super().__init__(config)
         self.config = config
         self.misc_keys_queue: Queue[Any] = Queue()
+        # Initialize all joint actions to 0.0
         self.curr_joint_actions = dict.fromkeys(self.action_features["names"].keys(), 0.0)
+        # Initialize gripper to middle position (50 for RANGE_0_100 mode which expects 0-100)
+        if self.config.gripper_action_key:
+            self.curr_joint_actions[self.config.gripper_action_key] = 50.0
 
     @property
     def action_features(self) -> dict:
@@ -83,30 +87,48 @@ class KeyboardJointTeleop(KeyboardTeleop):
         if self.config.gripper_action_key:
             gripper_keys = {"o": -1, "l": 1}
 
-        # Generate action based on current key states
-        for key, val in self.current_pressed.items():
+        # Generate action based on currently held keys (only process keys that are pressed, val=True)
+        for key, is_pressed in list(self.current_pressed.items()):
+            if not is_pressed:
+                # Key was released, remove it from tracking
+                del self.current_pressed[key]
+                continue
+
             # Handle arm joint keys
             if key in key_mappings:
                 joint_index, direction = key_mappings[key]
                 if joint_index < len(self.config.arm_action_keys):
                     joint_key = self.config.arm_action_keys[joint_index]
                     self.curr_joint_actions[joint_key] += direction * self.config.action_increment
+                    # Clamp arm joints to -100 to 100 (RANGE_M100_100 mode)
+                    self.curr_joint_actions[joint_key] = max(-100.0, min(100.0, self.curr_joint_actions[joint_key]))
 
             # Handle gripper keys
             elif key in gripper_keys and self.config.gripper_action_key:
                 direction = gripper_keys[key]
+                # Use gripper_increment if available, otherwise fall back to action_increment
+                gripper_inc = getattr(self.config, 'gripper_increment', self.config.action_increment)
                 self.curr_joint_actions[self.config.gripper_action_key] += (
-                    direction * self.config.action_increment
+                    direction * gripper_inc
                 )
-                # Normalize gripper to 0.0 - 1.0
+                # Clamp gripper to 0.0 - 100.0 (RANGE_0_100 mode expects 0-100)
                 self.curr_joint_actions[self.config.gripper_action_key] = max(
-                    0.0, min(1.0, self.curr_joint_actions[self.config.gripper_action_key])
+                    0.0, min(100.0, self.curr_joint_actions[self.config.gripper_action_key])
                 )
 
-            elif val:
+            else:
                 # If the key is pressed but doesn't belong to any action, add it to the misc_keys_queue
                 # this is useful for retrieving other events like interventions for RL, episode success, etc.
                 self.misc_keys_queue.put(key)
 
-        self.current_pressed.clear()
         return self.curr_joint_actions
+
+
+# Alias for hardware version - same implementation, just different default config
+class KeyboardJointHardwareTeleop(KeyboardJointTeleop):
+    """
+    Teleop class for hardware robots with descriptive motor names.
+    Uses the same implementation as KeyboardJointTeleop but with KeyboardJointHardwareTeleopConfig.
+    """
+    config_class = KeyboardJointHardwareTeleopConfig
+    name = "keyboard_joint_hardware"
