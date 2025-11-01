@@ -40,7 +40,7 @@ First, setup LeRobot and lerobot-ros in a virtual environment. Note that the Pyt
 ```bash
 # Create and activate virtual env
 conda create -y -n lerobot-ros python=3.12
-conda activate lerobot-ros
+conda activate lerobot_ros
 
 # Install lerobot
 git clone https://github.com/huggingface/lerobot
@@ -91,9 +91,111 @@ lerobot-ros-teleoperate \
 
 Once you have teleoperation working, you can use all standard LeRobot features as usual.
 
-## Hardware Control with SO-101
+## SO-101 Hardware Control with ros2_control
 
-For controlling real SO-101 hardware directly (bypassing ROS 2):
+For controlling real SO-101 hardware with ros2_control and MoveIt integration:
+
+### Prerequisites
+
+```bash
+# Build hardware interface and MoveIt packages
+cd ~/le_ws
+colcon build --packages-select so101_hardware so101_moveit
+source install/setup.bash
+```
+
+### 1. Calibrate Your Robot
+
+First, calibrate your SO-101 using LeRobot's calibration tool:
+
+```bash
+# Activate conda environment
+conda activate lerobot_ros
+
+# Find your robot's serial port
+lerobot-find-port
+
+# Run calibration (follow on-screen instructions)
+cd ~/le_ws
+./calibrate_and_install.sh my_follower /dev/ttyACM1
+```
+
+This creates calibration data at:
+- `~/.cache/huggingface/lerobot/calibration/robots/so101_follower/my_follower.json`
+- `~/le_ws/src/lerobot-ros/so101_moveit/config/motor_calibration.yaml`
+
+The calibration maps raw motor positions to URDF joint limits, ensuring accurate control.
+
+### 2. Launch MoveIt with Real Hardware
+
+```bash
+# Find robot port if needed
+lerobot-find-port
+
+# Launch MoveIt with real hardware (replace port as needed)
+ros2 launch so101_moveit demo.launch.py port:=/dev/ttyACM1
+```
+
+This launches:
+- C++ hardware interface plugin for Feetech STS3215 servos
+- ros2_control with 3 controllers (joint_state_broadcaster, arm_controller, gripper_controller)
+- MoveIt motion planning with RViz visualization
+
+**Launch Parameters:**
+- `port`: Serial port for servo bus (default: `/dev/ttyACM0`)
+- `use_fake_hardware`: Set to `false` for real hardware (default: `false`)
+- `calibration_file`: Path to motor calibration YAML (default: package config)
+
+### 3. Verify System
+
+```bash
+# Check controllers are active
+ros2 control list_controllers
+
+# Expected output:
+# arm_controller          [active]
+# gripper_controller      [active]
+# joint_state_broadcaster [active]
+
+# Monitor joint states (should publish at 100 Hz)
+ros2 topic echo /joint_states
+```
+
+### Features
+
+- Pure C++ hardware interface (no Python/GIL issues)
+- Fast controller loading (< 1 second)
+- 100 Hz real-time control loop
+- URDF-limit-aware motor calibration
+- Automatic torque management
+- MoveIt motion planning integration
+
+For detailed hardware interface documentation, see [so101_hardware/README.md](./so101_hardware/README.md)
+
+### Troubleshooting
+
+**Serial Port Permissions:**
+```bash
+# Add user to dialout group
+sudo usermod -a -G dialout $USER
+# Log out and back in
+
+# Or temporarily:
+sudo chmod 666 /dev/ttyACM1
+```
+
+**Port Changes:**
+Robot port may change when unplugged/replugged. Always verify with `lerobot-find-port` or `ls /dev/ttyACM*`
+
+**Motors Not Responding:**
+1. Check power supply is ON
+2. Verify port: `lsof /dev/ttyACM1`
+3. Check motor IDs are 1-6
+4. Try power cycling the robot
+
+## Direct Hardware Control (Bypass ROS)
+
+For controlling real SO-101 hardware directly without ros2_control (useful for testing):
 
 ```bash
 # Activate virtual environment
@@ -102,10 +204,13 @@ conda activate lerobot-ros
 # Install Feetech servo SDK
 pip install "feetech-servo-sdk>=1.0.0,<2.0.0"
 
+# Find robot port
+lerobot-find-port
+
 # Run teleoperation with hardware
 lerobot-ros-teleoperate \
   --robot.type=so101_follower_ros \
-  --robot.port=/dev/ttyUSB0 \
+  --robot.port=/dev/ttyACM1 \
   --robot.id=my_follower \
   --robot.go_home_on_connect=true \
   --robot.return_home_on_disconnect=true \
@@ -116,7 +221,7 @@ lerobot-ros-teleoperate \
 ```
 
 **Features:**
-- Direct servo control via USB
+- Direct servo control via USB (bypasses ROS)
 - Multi-key support (hold multiple keys simultaneously)
 - Configurable movement speed (`action_increment`)
 - Home pose on startup/shutdown
@@ -129,31 +234,31 @@ lerobot-ros-teleoperate \
 
 ## MoveIt Motion Planning
 
-The `lerobot_moveit_config` package provides MoveIt configuration for motion planning with SO-101.
+The `so101_moveit` package provides MoveIt configuration for motion planning with SO-101.
 
 ### Build MoveIt Package
 
 ```bash
-cd /home/nick-bell/le_ws
-colcon build --packages-select lerobot_moveit_config
+cd ~/le_ws
+colcon build --packages-select so101_moveit
 source install/setup.bash
 ```
 
-### Test with Demo (Fake Controllers)
+### Test with Fake Hardware
 
 ```bash
-ros2 launch lerobot_moveit_config demo.launch.py
+ros2 launch so101_moveit demo.launch.py use_fake_hardware:=true
 ```
 
 This launches:
 - move_group node (motion planning)
 - RViz with MoveIt plugin
-- Fake controllers for testing
+- Fake controllers for testing (no real hardware required)
 
 ### Planning Groups
 
-- **arm**: Joints 1-5 (shoulder through wrist)
-- **gripper**: Joint 6
+- **arm**: 5-DOF manipulator (shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll)
+- **gripper**: 1-DOF parallel gripper
 
 ### Named Poses
 
@@ -161,7 +266,7 @@ This launches:
 - **open** (gripper): Fully open
 - **close** (gripper): Fully closed
 
-For more details, see [lerobot_moveit_config/README.md](./lerobot_moveit_config/README.md)
+For more details, see [so101_moveit/README.md](./so101_moveit/README.md)
 
 ## Robot Integration Guide
 
