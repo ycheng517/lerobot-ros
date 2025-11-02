@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="so101_new_calib">
-    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+    <xacro:arg name="initial_positions_file" default="$(find so101_moveit)/config/initial_positions.yaml" />
     <xacro:arg name="use_fake_hardware" default="true" />
     <xacro:arg name="port" default="/dev/ttyACM0" />
     <xacro:arg name="calibration_file" default="" />

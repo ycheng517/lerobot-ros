@@ -14,7 +14,6 @@
 
 #include "so101_hardware/so101_system.hpp"
 
-#include <chrono>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -29,7 +28,7 @@ namespace so101_hardware
 {
 
 SO101SystemHardware::SO101SystemHardware()
-: driver_initialized_(false)
+: driver_initialized_(false), needs_initial_move_(false), initial_move_cycles_remaining_(0)
 {
 }
 
@@ -58,6 +57,9 @@ hardware_interface::CallbackReturn SO101SystemHardware::on_init(
 
   // Get calibration file parameter
   calibration_file_ = info_.hardware_parameters["calibration_file"];
+
+  // Get initial positions file parameter
+  initial_positions_file_ = info_.hardware_parameters["initial_positions_file"];
 
   // Initialize motor ID mapping
   motor_ids_["shoulder_pan"] = 1;
@@ -98,6 +100,13 @@ hardware_interface::CallbackReturn SO101SystemHardware::on_configure(
   if (!calibration_file_.empty() && !loadCalibration()) {
     RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"),
                  "Failed to load calibration from: %s", calibration_file_.c_str());
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
+  // Load initial positions
+  if (!initial_positions_file_.empty() && !loadInitialPositions()) {
+    RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"),
+                 "Failed to load initial positions from: %s", initial_positions_file_.c_str());
     return hardware_interface::CallbackReturn::ERROR;
   }
 
@@ -195,6 +204,39 @@ hardware_interface::CallbackReturn SO101SystemHardware::on_activate(
     }
   }
 
+  // Prepare for initial position move (will be executed in first write() call)
+  if (!initial_positions_.empty()) {
+    RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"), "Preparing initial positions...");
+    for (size_t i = 0; i < info_.joints.size(); i++)
+    {
+      const std::string& joint_name = info_.joints[i].name;
+
+      // Use initial position if defined, otherwise keep current position
+      if (initial_positions_.count(joint_name) > 0) {
+        double init_pos = initial_positions_[joint_name];
+        hw_commands_[i] = init_pos;
+        // Update position state to match target so controllers don't fight the initial move
+        hw_positions_[i] = init_pos;
+
+        RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+                    "  %s: %.3f rad", joint_name.c_str(), init_pos);
+      } else {
+        // No initial position defined, keep current position
+        hw_commands_[i] = hw_positions_[i];
+      }
+    }
+
+    // Set flag to trigger initial move in first write() cycle
+    needs_initial_move_ = true;
+    // Lock position readings immediately to prevent controllers from reading actual positions
+    initial_move_cycles_remaining_ = 1000;
+    RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+                "Position readings locked during initial move (50 seconds).");
+  } else {
+    RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+                "No initial positions loaded, robot will stay at current position");
+  }
+
   RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -223,6 +265,17 @@ hardware_interface::CallbackReturn SO101SystemHardware::on_deactivate(
 hardware_interface::return_type SO101SystemHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  // If we're still in initial move period, skip reading actual positions
+  // This keeps hw_positions_ locked to target values so controllers don't fight the move
+  if (initial_move_cycles_remaining_ > 0) {
+    initial_move_cycles_remaining_--;
+    if (initial_move_cycles_remaining_ == 0) {
+      RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+                  "Initial move complete. Resuming normal position readings.");
+    }
+    return hardware_interface::return_type::OK;
+  }
+
   // Read positions from all motors
   for (size_t i = 0; i < info_.joints.size(); i++)
   {
@@ -245,6 +298,14 @@ hardware_interface::return_type SO101SystemHardware::read(
 hardware_interface::return_type SO101SystemHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  // Use slower speed for initial move
+  u16 speed = needs_initial_move_ ? 1000 : 2400;
+
+  if (needs_initial_move_) {
+    RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+                "Executing initial move to configured positions...");
+  }
+
   // Prepare arrays for sync write
   std::vector<u8> motor_ids;
   std::vector<s16> positions;
@@ -260,10 +321,10 @@ hardware_interface::return_type SO101SystemHardware::write(
 
       int raw_position = radiansToRaw(hw_commands_[i], motor_calibration_[motor_id], is_gripper);
 
-      motor_ids.push_back(motor_id);
-      positions.push_back(raw_position);
-      speeds.push_back(2400);  // Default speed
-      accelerations.push_back(50);  // Default acceleration
+      motor_ids.push_back(static_cast<u8>(motor_id));
+      positions.push_back(static_cast<s16>(raw_position));
+      speeds.push_back(speed);
+      accelerations.push_back(static_cast<u8>(50));
     }
   }
 
@@ -272,6 +333,13 @@ hardware_interface::return_type SO101SystemHardware::write(
     servo_driver_.SyncWritePosEx(motor_ids.data(), motor_ids.size(),
                                   positions.data(), speeds.data(),
                                   accelerations.data());
+  }
+
+  // Clear flag after first write
+  if (needs_initial_move_) {
+    needs_initial_move_ = false;
+    RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+                "Initial move command sent.");
   }
 
   return hardware_interface::return_type::OK;
@@ -347,6 +415,80 @@ bool SO101SystemHardware::loadCalibration()
 
   RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
               "Successfully loaded calibration for %zu motors", motor_calibration_.size());
+
+  return true;
+}
+
+bool SO101SystemHardware::loadInitialPositions()
+{
+  if (initial_positions_file_.empty()) {
+    RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+                "No initial positions file specified, will start from current positions");
+    return true;
+  }
+
+  RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+              "Loading initial positions from: %s", initial_positions_file_.c_str());
+
+  std::ifstream file(initial_positions_file_);
+  if (!file.is_open()) {
+    RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"),
+                 "Failed to open initial positions file: %s", initial_positions_file_.c_str());
+    return false;
+  }
+
+  // Simple YAML parser for initial_positions section
+  std::string line;
+  bool in_initial_positions_section = false;
+
+  while (std::getline(file, line)) {
+    // Skip comments and empty lines
+    if (line.empty() || line[0] == '#') continue;
+
+    // Check if we're entering the initial_positions section
+    if (line.find("initial_positions:") != std::string::npos) {
+      in_initial_positions_section = true;
+      continue;
+    }
+
+    // Exit if we encounter another top-level section
+    if (in_initial_positions_section && line.find_first_not_of(" \t") == 0 && line.back() == ':') {
+      break;
+    }
+
+    // Parse joint positions (indented lines with :)
+    if (in_initial_positions_section) {
+      size_t colon_pos = line.find(':');
+      if (colon_pos != std::string::npos) {
+        std::string joint_name = line.substr(0, colon_pos);
+        std::string value = line.substr(colon_pos + 1);
+
+        // Trim whitespace
+        joint_name.erase(0, joint_name.find_first_not_of(" \t"));
+        joint_name.erase(joint_name.find_last_not_of(" \t") + 1);
+        value.erase(0, value.find_first_not_of(" \t"));
+
+        // Remove comments from value
+        size_t comment_pos = value.find('#');
+        if (comment_pos != std::string::npos) {
+          value = value.substr(0, comment_pos);
+        }
+        value.erase(value.find_last_not_of(" \t") + 1);
+
+        // Check if this joint is valid
+        if (motor_ids_.count(joint_name) > 0) {
+          initial_positions_[joint_name] = std::stod(value);
+          RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+                      "  %s: %.3f rad", joint_name.c_str(), initial_positions_[joint_name]);
+        }
+      }
+    }
+  }
+
+  file.close();
+
+  RCLCPP_INFO(rclcpp::get_logger("SO101SystemHardware"),
+              "Successfully loaded initial positions for %zu joints", initial_positions_.size());
 
   return true;
 }

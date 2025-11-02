@@ -76,6 +76,7 @@ private:
   // Parameters
   std::string port_;
   std::string calibration_file_;
+  std::string initial_positions_file_;
 
   // Joint state
   std::vector<double> hw_positions_;
@@ -86,14 +87,22 @@ private:
   SMS_STS servo_driver_;
   bool driver_initialized_;
 
+  // Initial pose flag
+  bool needs_initial_move_;
+  int initial_move_cycles_remaining_;
+
   // Motor ID mapping (joint name -> motor ID)
   std::map<std::string, int> motor_ids_;
 
   // Calibration data (motor ID -> calibration)
   std::map<int, MotorCalibration> motor_calibration_;
 
+  // Initial positions (joint name -> radians)
+  std::map<std::string, double> initial_positions_;
+
   // Helper methods
   bool loadCalibration();
+  bool loadInitialPositions();
   double rawToRadians(int raw_position, const MotorCalibration& calib, bool is_gripper);
   int radiansToRaw(double radians, const MotorCalibration& calib, bool is_gripper);
 };

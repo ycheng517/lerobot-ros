@@ -16,6 +16,7 @@
                     <xacro:if value="${calibration_file != ''}">
                         <param name="calibration_file">${calibration_file}</param>
                     </xacro:if>
+                    <param name="initial_positions_file">${initial_positions_file}</param>
                 </xacro:unless>
             </hardware>
             <joint name="shoulder_pan">
