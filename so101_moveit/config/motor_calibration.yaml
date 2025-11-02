@@ -8,36 +8,30 @@
 shoulder_pan:
   id: 1
   drive_mode: 0
-  homing_offset: 427
-  range_min: 792
-  range_max: 3251
+  range_min: 847
+  range_max: 3371
 shoulder_lift:
   id: 2
   drive_mode: 0
-  homing_offset: 667
-  range_min: 824
-  range_max: 3202
+  range_min: 870
+  range_max: 3270
 elbow_flex:
   id: 3
   drive_mode: 0
-  homing_offset: -826
-  range_min: 944
-  range_max: 3148
+  range_min: 856
+  range_max: 3081
 wrist_flex:
   id: 4
   drive_mode: 0
-  homing_offset: 543
-  range_min: 820
-  range_max: 3112
+  range_min: 893
+  range_max: 3228
 wrist_roll:
   id: 5
   drive_mode: 0
-  homing_offset: -493
-  range_min: 0
-  range_max: 4094
+  range_min: 52
+  range_max: 3911
 gripper:
   id: 6
   drive_mode: 0
-  homing_offset: -1061
-  range_min: 2034
-  range_max: 3524
+  range_min: 2037
+  range_max: 3519

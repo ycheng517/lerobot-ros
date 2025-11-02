@@ -106,7 +106,6 @@ hardware_interface::CallbackReturn SO101SystemHardware::on_configure(
     RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"),
                  "Failed to connect to motor bus on port %s. Check connection and permissions.",
                  port_.c_str());
-    RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"), "");
     RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"), "TROUBLESHOOTING:");
     RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"),
                  "1. Check if robot is connected: ls /dev/ttyACM* /dev/ttyUSB*");
@@ -114,7 +113,6 @@ hardware_interface::CallbackReturn SO101SystemHardware::on_configure(
                  "2. If robot is on different port, launch with: port:=/dev/ttyACMX");
     RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"),
                  "3. Check permissions: sudo usermod -aG dialout $USER (then logout/login)");
-    RCLCPP_ERROR(rclcpp::get_logger("SO101SystemHardware"), "");
     return hardware_interface::CallbackReturn::ERROR;
   }
 
@@ -187,18 +185,7 @@ hardware_interface::CallbackReturn SO101SystemHardware::on_activate(
     if (servo_driver_.FeedBack(motor_id) != -1) {
       int raw_pos = servo_driver_.ReadPos(-1);
       bool is_gripper = (joint_name == "gripper");
-
-      if (motor_calibration_.count(motor_id) > 0) {
-        hw_positions_[i] = rawToRadians(raw_pos, motor_calibration_[motor_id], is_gripper);
-      } else {
-        // No calibration - use raw position normalized to [-pi, pi] for regular joints
-        // or [0, 1] for gripper
-        if (is_gripper) {
-          hw_positions_[i] = raw_pos / 4095.0;  // Normalize to 0-1
-        } else {
-          hw_positions_[i] = (raw_pos - 2048.0) * (M_PI / 2048.0);  // Center at 2048, scale to radians
-        }
-      }
+      hw_positions_[i] = rawToRadians(raw_pos, motor_calibration_[motor_id], is_gripper);
 
       hw_commands_[i] = hw_positions_[i];
 
@@ -246,15 +233,7 @@ hardware_interface::return_type SO101SystemHardware::read(
       int raw_pos = servo_driver_.ReadPos(-1);
       bool is_gripper = (joint_name == "gripper");
 
-      if (motor_calibration_.count(motor_id) > 0) {
-        hw_positions_[i] = rawToRadians(raw_pos, motor_calibration_[motor_id], is_gripper);
-      } else {
-        if (is_gripper) {
-          hw_positions_[i] = raw_pos / 4095.0;
-        } else {
-          hw_positions_[i] = (raw_pos - 2048.0) * (M_PI / 2048.0);
-        }
-      }
+      hw_positions_[i] = rawToRadians(raw_pos, motor_calibration_[motor_id], is_gripper);
     }
 
     hw_velocities_[i] = 0.0;  // TODO: Read actual velocity if needed
@@ -279,16 +258,7 @@ hardware_interface::return_type SO101SystemHardware::write(
       int motor_id = motor_ids_[joint_name];
       bool is_gripper = (joint_name == "gripper");
 
-      int raw_position;
-      if (motor_calibration_.count(motor_id) > 0) {
-        raw_position = radiansToRaw(hw_commands_[i], motor_calibration_[motor_id], is_gripper);
-      } else {
-        if (is_gripper) {
-          raw_position = static_cast<int>(hw_commands_[i] * 4095.0);
-        } else {
-          raw_position = static_cast<int>(hw_commands_[i] * (2048.0 / M_PI) + 2048.0);
-        }
-      }
+      int raw_position = radiansToRaw(hw_commands_[i], motor_calibration_[motor_id], is_gripper);
 
       motor_ids.push_back(motor_id);
       positions.push_back(raw_position);
@@ -328,7 +298,7 @@ bool SO101SystemHardware::loadCalibration()
   // Simple YAML parser for calibration file
   std::string line;
   std::string current_motor;
-  MotorCalibration current_calib = {0, 0, 0, 0, 4095};
+  MotorCalibration current_calib = {0, 0, 0, 0};
 
   while (std::getline(file, line)) {
     // Skip comments and empty lines
@@ -344,7 +314,7 @@ bool SO101SystemHardware::loadCalibration()
 
       // Start new motor
       current_motor = line.substr(0, line.length() - 1);
-      current_calib = {0, 0, 0, 0, 4095};
+      current_calib = {0, 0, 0, 0};
       continue;
     }
 
@@ -362,7 +332,6 @@ bool SO101SystemHardware::loadCalibration()
 
       if (key == "id") current_calib.id = std::stoi(value);
       else if (key == "drive_mode") current_calib.drive_mode = std::stoi(value);
-      else if (key == "homing_offset") current_calib.homing_offset = std::stoi(value);
       else if (key == "range_min") current_calib.range_min = std::stoi(value);
       else if (key == "range_max") current_calib.range_max = std::stoi(value);
     }
@@ -384,72 +353,68 @@ bool SO101SystemHardware::loadCalibration()
 
 double SO101SystemHardware::rawToRadians(int raw_position, const MotorCalibration& calib, bool is_gripper)
 {
-  if (is_gripper) {
-    // Gripper: normalize to 0-1 based on calibrated range
-    double normalized = static_cast<double>(raw_position - calib.range_min) /
-                       static_cast<double>(calib.range_max - calib.range_min);
-    return std::max(0.0, std::min(1.0, normalized));
+  // Clamp to calibration range (no homing offset applied)
+  int clamped = std::max(calib.range_min, std::min(calib.range_max, raw_position));
+
+  // Normalize to [0, 1] based on calibrated range
+  double progress = static_cast<double>(clamped - calib.range_min) /
+                   static_cast<double>(calib.range_max - calib.range_min);
+
+  // Get URDF limits for each joint
+  // TODO: Load these from URDF dynamically in on_configure()
+  double urdf_lower, urdf_upper;
+  if (calib.id == 1) {  // shoulder_pan
+    urdf_lower = -1.91986; urdf_upper = 1.91986;
+  } else if (calib.id == 2) {  // shoulder_lift
+    urdf_lower = -1.74533; urdf_upper = 1.74533;
+  } else if (calib.id == 3) {  // elbow_flex
+    urdf_lower = -1.74533; urdf_upper = 1.5708;
+  } else if (calib.id == 4) {  // wrist_flex
+    urdf_lower = -1.65806; urdf_upper = 1.65806;
+  } else if (calib.id == 5) {  // wrist_roll
+    urdf_lower = -2.79253; urdf_upper = 2.79253;
+  } else if (calib.id == 6) {  // gripper - use radians like other joints!
+    urdf_lower = -0.1745; urdf_upper = 1.4483;
   } else {
-    // Regular joint: Map calibration range directly to URDF joint limits
-    // The calibration min/max represents the physical range captured during calibration
-    // This should map to the URDF lower/upper limits
-    double progress = static_cast<double>(raw_position - calib.range_min) /
-                     static_cast<double>(calib.range_max - calib.range_min);
-
-    // URDF joint limits (from so101_new_calib.urdf)
-    // Note: These are hard-coded here since they're fixed by the URDF
-    double urdf_lower, urdf_upper;
-    if (calib.id == 1) {  // shoulder_pan
-      urdf_lower = -1.91986; urdf_upper = 1.91986;
-    } else if (calib.id == 2) {  // shoulder_lift
-      urdf_lower = -1.74533; urdf_upper = 1.74533;
-    } else if (calib.id == 3) {  // elbow_flex
-      urdf_lower = -1.74533; urdf_upper = 1.5708;
-    } else if (calib.id == 4) {  // wrist_flex
-      urdf_lower = -1.65806; urdf_upper = 1.65806;
-    } else if (calib.id == 5) {  // wrist_roll
-      urdf_lower = -2.79253; urdf_upper = 2.79253;
-    } else {
-      // Fallback to [-π, π]
-      urdf_lower = -M_PI; urdf_upper = M_PI;
-    }
-
-    return progress * (urdf_upper - urdf_lower) + urdf_lower;
+    urdf_lower = -M_PI; urdf_upper = M_PI;
   }
+
+  // Scale to URDF limits (radians for ALL joints, including gripper)
+  return progress * (urdf_upper - urdf_lower) + urdf_lower;
 }
 
 int SO101SystemHardware::radiansToRaw(double radians, const MotorCalibration& calib, bool is_gripper)
 {
-  if (is_gripper) {
-    // Gripper: denormalize from 0-1 to calibrated range
-    double clamped = std::max(0.0, std::min(1.0, radians));
-    return static_cast<int>(clamped * (calib.range_max - calib.range_min) + calib.range_min);
+  // Get URDF limits for each joint
+  // TODO: Load these from URDF dynamically in on_configure()
+  double urdf_lower, urdf_upper;
+  if (calib.id == 1) {  // shoulder_pan
+    urdf_lower = -1.91986; urdf_upper = 1.91986;
+  } else if (calib.id == 2) {  // shoulder_lift
+    urdf_lower = -1.74533; urdf_upper = 1.74533;
+  } else if (calib.id == 3) {  // elbow_flex
+    urdf_lower = -1.74533; urdf_upper = 1.5708;
+  } else if (calib.id == 4) {  // wrist_flex
+    urdf_lower = -1.65806; urdf_upper = 1.65806;
+  } else if (calib.id == 5) {  // wrist_roll
+    urdf_lower = -2.79253; urdf_upper = 2.79253;
+  } else if (calib.id == 6) {  // gripper - use radians like other joints!
+    urdf_lower = -0.1745; urdf_upper = 1.4483;
   } else {
-    // Regular joint: Reverse mapping from URDF limits to calibration range
-    // Get URDF limits for this joint
-    double urdf_lower, urdf_upper;
-    if (calib.id == 1) {  // shoulder_pan
-      urdf_lower = -1.91986; urdf_upper = 1.91986;
-    } else if (calib.id == 2) {  // shoulder_lift
-      urdf_lower = -1.74533; urdf_upper = 1.74533;
-    } else if (calib.id == 3) {  // elbow_flex
-      urdf_lower = -1.74533; urdf_upper = 1.5708;
-    } else if (calib.id == 4) {  // wrist_flex
-      urdf_lower = -1.65806; urdf_upper = 1.65806;
-    } else if (calib.id == 5) {  // wrist_roll
-      urdf_lower = -2.79253; urdf_upper = 2.79253;
-    } else {
-      // Fallback to [-π, π]
-      urdf_lower = -M_PI; urdf_upper = M_PI;
-    }
-
-    // Clamp to URDF limits and convert to progress [0, 1]
-    double clamped_radians = std::min(urdf_upper, std::max(urdf_lower, radians));
-    double progress = (clamped_radians - urdf_lower) / (urdf_upper - urdf_lower);
-
-    // Map to raw motor position
-    return static_cast<int>(progress * (calib.range_max - calib.range_min) + calib.range_min);
+    urdf_lower = -M_PI; urdf_upper = M_PI;
   }
+
+  // Clamp to URDF limits
+  double clamped_radians = std::min(urdf_upper, std::max(urdf_lower, radians));
+
+  // Normalize to [0, 1]
+  double progress = (clamped_radians - urdf_lower) / (urdf_upper - urdf_lower);
+  
+  // Scale to motor range
+  int raw_position = static_cast<int>(progress * (calib.range_max - calib.range_min) + calib.range_min);
+
+  // Return raw position directly (no homing offset)
+  return raw_position;
 }
 
 }  // namespace so101_hardware

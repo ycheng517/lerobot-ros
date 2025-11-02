@@ -38,7 +38,6 @@ struct MotorCalibration
 {
   int id;
   int drive_mode;
-  int homing_offset;
   int range_min;
   int range_max;
 };
