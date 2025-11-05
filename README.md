@@ -40,16 +40,16 @@ First, setup LeRobot and lerobot-ros in a virtual environment. Note that the Pyt
 ```bash
 # Create and activate virtual env
 conda create -y -n lerobot-ros python=3.12
+conda install -c conda-forge libstdcxx-ng -y # needed as rclpy requires GLIBCXX_3.4.30 symbols
 conda activate lerobot-ros
 
-# Install lerobot
-git clone https://github.com/huggingface/lerobot
-pip install -e lerobot
+# Source ROS
+source /opt/ros/jazzy/setup.sh
 
-# Install lerobot-ros packages
+# Install lerobot-ros packages (this will install a compatible version of lerobot as well)
 git clone https://github.com/ycheng517/lerobot-ros
-pip install -e lerobot-ros/lerobot_robot_ros
-pip install -e lerobot-ros/lerobot_teleoperator_devices
+cd lerobot-ros
+pip install -e lerobot_robot_ros lerobot_teleoperator_devices
 ```
 
 Then, setup the Simulated SO-101 by following instructions in: https://github.com/Pavankv92/lerobot_ws

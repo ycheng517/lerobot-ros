@@ -36,7 +36,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "lerobot",
+    "lerobot>=0.4.0,<0.5.0",
     "rclpy",
     "control_msgs",
     "sensor_msgs",
