@@ -40,8 +40,8 @@ First, setup LeRobot and lerobot-ros in a virtual environment. Note that the Pyt
 ```bash
 # Create and activate virtual env
 conda create -y -n lerobot-ros python=3.12
-conda install -c conda-forge libstdcxx-ng -y # needed as rclpy requires GLIBCXX_3.4.30 symbols
 conda activate lerobot-ros
+conda install -c conda-forge libstdcxx-ng -y # needed as rclpy requires GLIBCXX_3.4.30 symbols
 
 # Source ROS
 source /opt/ros/jazzy/setup.sh
