@@ -154,6 +154,7 @@ class ROS2Robot(Robot):
             )
             self.ros2_interface.servo(linear=linear_vel, angular=angular_vel)
         elif self.config.action_type in (ActionType.JOINT_POSITION, ActionType.JOINT_TRAJECTORY):
+            #print (self.config.max_relative_target)
             if self.config.max_relative_target is not None:
                 goal_present_pos = {}
                 joint_state = self.ros2_interface.joint_state
@@ -166,6 +167,7 @@ class ROS2Robot(Robot):
                 action = ensure_safe_goal_position(goal_present_pos, self.config.max_relative_target)
 
             joint_positions = [action[joint + ".pos"] for joint in self.config.ros2_interface.arm_joint_names]
+            print (action.keys())
             self.ros2_interface.send_joint_position_command(joint_positions)
 
         gripper_pos = action["gripper.pos"]
